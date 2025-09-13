@@ -9,14 +9,16 @@ pub struct TreeNode {
     parent: RefCell<Option<Weak<TreeNode>>>,
 }
 
+type TreeNodeRef = Rc<TreeNode>;
+
 pub trait TreeTrait {
     fn new(name: impl Into<String>) -> Rc<Self>;
     fn add_children(self: &Rc<Self>, names: &[&str]);
-    fn add_child(self: &Rc<Self>, child: Rc<TreeNode>);
-    fn get_child(self: &Rc<Self>, path: &str) -> Option<Rc<TreeNode>>;
+    fn add_child(self: &Rc<Self>, child: TreeNodeRef);
+    fn get_child(self: &Rc<Self>, path: &str) -> Option<TreeNodeRef>;
     fn remove_child(self: &Rc<Self>, name: &str) -> Result<(), &'static str>;
-    fn parent(&self) -> Option<Rc<TreeNode>>;
-    fn children(&self) -> Vec<Rc<TreeNode>>;
+    fn parent(&self) -> Option<TreeNodeRef>;
+    fn children(&self) -> Vec<TreeNodeRef>;
     fn name(&self) -> &str;
     fn path(&self) -> String;
     fn is_root(&self) -> bool;
@@ -50,7 +52,7 @@ impl TreeNode {
         result
     }
 
-    fn get_immediate_child(self: &Rc<Self>, name: &str) -> Option<Rc<TreeNode>> {
+    fn get_immediate_child(self: &Rc<Self>, name: &str) -> Option<TreeNodeRef> {
         // Returns child if exists. Note that modifying child will modify original tree.
         // Change type annotation as necessary to complete this functionality.
         self.children
@@ -81,14 +83,14 @@ impl TreeTrait for TreeNode {
         }
     }
 
-    fn add_child(self: &Rc<Self>, child: Rc<TreeNode>) {
+    fn add_child(self: &Rc<Self>, child: TreeNodeRef) {
         // Set parent of child
         *child.parent.borrow_mut() = Some(Rc::downgrade(self));
         // Add child to this node
         self.children.borrow_mut().push(child);
     }
 
-    fn get_child(self: &Rc<Self>, path: &str) -> Option<Rc<TreeNode>> {
+    fn get_child(self: &Rc<Self>, path: &str) -> Option<TreeNodeRef> {
         // Same as "get_child", except might be recursive child1/child2/...
         if path.is_empty() {
             return Some(self.clone());
@@ -108,7 +110,7 @@ impl TreeTrait for TreeNode {
         Some(current_node)
     }
 
-    fn remove_child(self: &Rc<Self>, name: &str) -> Result<(), &'static str> {
+    fn remove_child(self: &TreeNodeRef, name: &str) -> Result<(), &'static str> {
         // Look for "name" if exists and deletes; frees correctly. Else complains [name] not found under [self.path]
         let mut children = self.children.borrow_mut();
         let initial_len = children.len();
@@ -121,11 +123,11 @@ impl TreeTrait for TreeNode {
             Ok(())
         }
     }
-    fn parent(&self) -> Option<Rc<TreeNode>> {
+    fn parent(&self) -> Option<TreeNodeRef> {
         self.parent.borrow().as_ref()?.upgrade()
     }
 
-    fn children(&self) -> Vec<Rc<TreeNode>> {
+    fn children(&self) -> Vec<TreeNodeRef> {
         self.children.borrow().clone()
     }
 
@@ -135,7 +137,7 @@ impl TreeTrait for TreeNode {
 
     fn path(&self) -> String {
         if self.is_root() {
-            self.name().to_string()
+            format!("/{}", self.name().to_string())
         } else {
             format!("{}/{}", self.parent().unwrap().path(), self.name())
         }
